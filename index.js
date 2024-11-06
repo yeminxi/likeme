@@ -41,14 +41,14 @@ app.get('/info', (req,res) => {
     });
 })
 
-app.get('/like', (req, res) => {
+app.get('/like', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
     const queryIP = new AV.Query('likeUser').equalTo('ip', ip);
-    queryIP.find().then(function (results) {
-        console.log(results)
+
+    try {
+        const results = await queryIP.find();
         if (results.length > 0) {
-            const data = {code: '201', msg: '你的爱意已经收到啦~'}
-            res.send(data);
+            res.send({ code: '201', msg: '你的爱意已经收到啦~' });
         } else {
             const Like = AV.Object.extend('likeUser');
             const like = new Like();
@@ -56,27 +56,26 @@ app.get('/like', (req, res) => {
             const acl = new AV.ACL();
             acl.setPublicReadAccess(true);
             like.setACL(acl);
-            like.save().then((like) => {
-                account.increment('count', +1);
-                account.save(null, {
-                    query: new AV.Query('likeCount').greaterThanOrEqualTo('count', +1),fetchWhenSave: true
-                }).then((account) => {
-                    const data = {code: '200', msg: 'success', data: {count: account.attributes.count}}
-                    res.send(data);
-                }, (error) => {
-                    if (error.code === 305) {
-                        const data = {code: '201', msg: 'error'}
-                        res.send(data);
-                    }
-                });
-            }, (error) => {
-                console.error('Failed to create new object, with error message: ' + error.message);
-            });
+
+            await like.save();
+
+            const accountQuery = new AV.Query('likeCount'); // Assuming you have only one likeCount object
+            let account = await accountQuery.first();
+
+            if (!account) {
+                account = new AV.Object('likeCount');
+                account.set('count', 1);
+            } else {
+                account.increment('count');
+            }
+
+            await account.save();
+            res.send({ code: '200', msg: 'success', data: { count: account.get('count') } });
         }
-    }).catch(function (error) {
-        const data = {code: '201', msg: 'error'}
-        res.send(data);
-    });
-})
+    } catch (error) {
+        console.error('Error processing like:', error);
+        res.status(500).send({ code: '201', msg: '服务器错误' }); // More informative error message
+    }
+});
 
 app.listen(port, () => {})
