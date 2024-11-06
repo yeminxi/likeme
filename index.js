@@ -41,41 +41,42 @@ app.get('/info', (req,res) => {
     });
 })
 
-app.get('/like', async (req, res) => {
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
-    const queryIP = new AV.Query('likeUser').equalTo('ip', ip);
-
-    try {
-        const results = await queryIP.find();
-        if (results.length > 0) {
-            res.send({ code: '201', msg: '你的爱意已经收到啦~' });
-        } else {
-            const Like = AV.Object.extend('likeUser');
-            const like = new Like();
-            like.set('ip', ip);
-            const acl = new AV.ACL();
-            acl.setPublicReadAccess(true);
-            like.setACL(acl);
-
-            await like.save();
-
-            const accountQuery = new AV.Query('likeCount'); // Assuming you have only one likeCount object
-            let account = await accountQuery.first();
-
-            if (!account) {
-                account = new AV.Object('likeCount');
-                account.set('count', 1);
-            } else {
-                account.increment('count');
-            }
-
-            await account.save();
-            res.send({ code: '200', msg: 'success', data: { count: account.get('count') } });
-        }
-    } catch (error) {
-        console.error('Error processing like:', error);
-        res.status(500).send({ code: '201', msg: '服务器错误' }); // More informative error message
-    }
-});
+app.get('/like', (req, res) => {
+45    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
+46    const queryIP = new AV.Query('likeUser').equalTo('ip', ip);
+47    queryIP.find().then(function (results) {
+48        console.log(results)
+49        if (results.length > 0) {
+50            const data = {code: '201', msg: '你的爱意已经收到啦~', data: {count: '你的爱意已经收到啦~'}}
+51            res.send(data);
+52        } else {
+53            const Like = AV.Object.extend('likeUser');
+54            const like = new Like();
+55            like.set('ip', ip);
+56            const acl = new AV.ACL();
+57            acl.setPublicReadAccess(true);
+58            like.setACL(acl);
+59            like.save().then((like) => {
+60                account.increment('count', +1);
+61                account.save(null, {
+62                    query: new AV.Query('likeCount').greaterThanOrEqualTo('count', +1),fetchWhenSave: true
+63                }).then((account) => {
+64                    const data = {code: '200', msg: 'success', data: {count: account.attributes.count}}
+65                    res.send(data);
+66                }, (error) => {
+67                    if (error.code === 305) {
+68                        const data = {code: '201', msg: 'error'}
+69                        res.send(data);
+70                    }
+71                });
+72            }, (error) => {
+73                console.error('Failed to create new object, with error message: ' + error.message);
+74            });
+75        }
+76    }).catch(function (error) {
+77        const data = {code: '201', msg: 'error'}
+78        res.send(data);
+79    });
+80})
 
 app.listen(port, () => {})
