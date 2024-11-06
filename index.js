@@ -47,7 +47,7 @@ app.get('/like', (req, res) => {
     queryIP.find().then(function (results) {
         console.log(results)
         if (results.length > 0) {
-            const data = {code: '201', msg: '你的爱意已经收到啦~', data: {count: '你的爱意已经收到啦~'}}
+            const data = {code: '201', msg: 'error', data: {count: '你的爱意已经收到啦~'}}
             res.send(data);
         } else {
             const Like = AV.Object.extend('likeUser');
